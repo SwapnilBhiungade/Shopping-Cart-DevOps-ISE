@@ -3,20 +3,25 @@ from flask import *
 import sqlite3
 import os
 import bcrypt
+from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
 from flask import Flask
 from prometheus_flask_exporter import PrometheusMetrics
+
+load_dotenv()
 
 app = Flask(__name__)
 
 metrics = PrometheusMetrics(app)
 
 app.secret_key = os.getenv("SECRET_KEY", secrets.token_hex(32))
-UPLOAD_FOLDER = "static/uploads"
+DATABASE_PATH = os.getenv("DATABASE_PATH", "database.db")
+UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", "static/uploads")
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 ALLOWED_EXTENSIONS = set(['jpeg', 'jpg', 'png', 'gif'])
+
 
 def hash_password(password):
     return bcrypt.hashpw(
@@ -31,8 +36,13 @@ def verify_password(password, hashed_password):
         hashed_password.encode("utf-8")
     )
 
+
+def env_bool(name, default=False):
+    return os.getenv(name, str(default)).lower() in ("1", "true", "yes", "on")
+
+
 def getLoginDetails():
-    with sqlite3.connect('database.db') as conn:
+    with sqlite3.connect(DATABASE_PATH) as conn:
         cur = conn.cursor()
         if 'email' not in session:
             loggedIn = False
@@ -50,7 +60,7 @@ def getLoginDetails():
 @app.route("/")
 def root():
     loggedIn, firstName, noOfItems = getLoginDetails()
-    with sqlite3.connect('database.db') as conn:
+    with sqlite3.connect(DATABASE_PATH) as conn:
         cur = conn.cursor()
         cur.execute('SELECT productId, name, price, description, image, stock FROM products')
         itemData = cur.fetchall()
@@ -61,7 +71,7 @@ def root():
 
 @app.route("/add")
 def admin():
-    with sqlite3.connect('database.db') as conn:
+    with sqlite3.connect(DATABASE_PATH) as conn:
         cur = conn.cursor()
         cur.execute("SELECT categoryId, name FROM categories")
         categories = cur.fetchall()
@@ -87,7 +97,7 @@ def addItem():
             filename = secure_filename(image.filename)
             image.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
         imagename = filename
-        with sqlite3.connect('database.db') as conn:
+        with sqlite3.connect(DATABASE_PATH) as conn:
             try:
                 cur = conn.cursor()
                 cur.execute('''INSERT INTO products (name, price, description, image, stock, categoryId) VALUES (?, ?, ?, ?, ?, ?)''', (name, price, description, imagename, stock, categoryId))
@@ -102,7 +112,7 @@ def addItem():
 
 @app.route("/remove")
 def remove():
-    with sqlite3.connect('database.db') as conn:
+    with sqlite3.connect(DATABASE_PATH) as conn:
         cur = conn.cursor()
         cur.execute('SELECT productId, name, price, description, image, stock FROM products')
         data = cur.fetchall()
@@ -112,7 +122,7 @@ def remove():
 @app.route("/removeItem")
 def removeItem():
     productId = request.args.get('productId')
-    with sqlite3.connect('database.db') as conn:
+    with sqlite3.connect(DATABASE_PATH) as conn:
         try:
             cur = conn.cursor()
             cur.execute('DELETE FROM products WHERE productID = ?', (productId, ))
@@ -129,7 +139,7 @@ def removeItem():
 def displayCategory():
         loggedIn, firstName, noOfItems = getLoginDetails()
         categoryId = request.args.get("categoryId")
-        with sqlite3.connect('database.db') as conn:
+        with sqlite3.connect(DATABASE_PATH) as conn:
             cur = conn.cursor()
             cur.execute("SELECT products.productId, products.name, products.price, products.image, categories.name FROM products, categories WHERE products.categoryId = categories.categoryId AND categories.categoryId = ?", (categoryId, ))
             data = cur.fetchall()
@@ -150,7 +160,7 @@ def editProfile():
     if 'email' not in session:
         return redirect(url_for('root'))
     loggedIn, firstName, noOfItems = getLoginDetails()
-    with sqlite3.connect('database.db') as conn:
+    with sqlite3.connect(DATABASE_PATH) as conn:
         cur = conn.cursor()
         cur.execute("SELECT userId, email, firstName, lastName, address1, address2, zipcode, city, state, country, phone FROM users WHERE email = ?", (session['email'], ))
         profileData = cur.fetchone()
@@ -166,7 +176,7 @@ def changePassword():
         oldPassword = request.form['oldpassword']
         newPassword = request.form['newpassword']
 
-        with sqlite3.connect('database.db') as conn:
+        with sqlite3.connect(DATABASE_PATH) as conn:
             cur = conn.cursor()
 
             cur.execute(
@@ -209,7 +219,7 @@ def updateProfile():
         state = request.form['state']
         country = request.form['country']
         phone = request.form['phone']
-        with sqlite3.connect('database.db') as con:
+        with sqlite3.connect(DATABASE_PATH) as con:
                 try:
                     cur = con.cursor()
                     cur.execute('UPDATE users SET firstName = ?, lastName = ?, address1 = ?, address2 = ?, zipcode = ?, city = ?, state = ?, country = ?, phone = ? WHERE email = ?', (firstName, lastName, address1, address2, zipcode, city, state, country, phone, email))
@@ -250,7 +260,7 @@ def login():
 def productDescription():
     loggedIn, firstName, noOfItems = getLoginDetails()
     productId = request.args.get('productId')
-    with sqlite3.connect('database.db') as conn:
+    with sqlite3.connect(DATABASE_PATH) as conn:
         cur = conn.cursor()
         cur.execute('SELECT productId, name, price, description, image, stock FROM products WHERE productId = ?', (productId, ))
         productData = cur.fetchone()
@@ -263,7 +273,7 @@ def addToCart():
         return redirect(url_for('loginForm'))
     else:
         productId = int(request.args.get('productId'))
-        with sqlite3.connect('database.db') as conn:
+        with sqlite3.connect(DATABASE_PATH) as conn:
             cur = conn.cursor()
             cur.execute("SELECT userId FROM users WHERE email = ?", (session['email'], ))
             userId = cur.fetchone()[0]
@@ -283,7 +293,7 @@ def cart():
         return redirect(url_for('loginForm'))
     loggedIn, firstName, noOfItems = getLoginDetails()
     email = session['email']
-    with sqlite3.connect('database.db') as conn:
+    with sqlite3.connect(DATABASE_PATH) as conn:
         cur = conn.cursor()
         cur.execute("SELECT userId FROM users WHERE email = ?", (email, ))
         userId = cur.fetchone()[0]
@@ -300,7 +310,7 @@ def removeFromCart():
         return redirect(url_for('loginForm'))
     email = session['email']
     productId = int(request.args.get('productId'))
-    with sqlite3.connect('database.db') as conn:
+    with sqlite3.connect(DATABASE_PATH) as conn:
         cur = conn.cursor()
         cur.execute("SELECT userId FROM users WHERE email = ?", (email, ))
         userId = cur.fetchone()[0]
@@ -320,7 +330,7 @@ def logout():
     return redirect(url_for('root'))
 
 def is_valid(email, password):
-    with sqlite3.connect("database.db") as con:
+    with sqlite3.connect(DATABASE_PATH) as con:
         cur = con.cursor()
         cur.execute(
             "SELECT password FROM users WHERE email = ?",
@@ -346,7 +356,7 @@ def register():
         country = request.form['country']
         phone = request.form['phone']
 
-        with sqlite3.connect('database.db') as con:
+        with sqlite3.connect(DATABASE_PATH) as con:
             try:
                 cur = con.cursor()
                 cur.execute('INSERT INTO users (password, email, firstName, lastName, address1, address2, zipcode, city, state, country, phone) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', (hash_password(password), email, firstName, lastName, address1, address2, zipcode, city, state, country, phone))
@@ -387,8 +397,8 @@ def parse(data):
 
 if __name__ == "__main__":
     app.run(
-        host="0.0.0.0",  # nosec B104
-        port=5000,
-        debug=False,
+        host=os.getenv("FLASK_HOST", "0.0.0.0"),  # nosec B104
+        port=int(os.getenv("FLASK_PORT", "5000")),
+        debug=env_bool("FLASK_DEBUG", False),
         use_reloader=False
     )

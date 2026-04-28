@@ -1,7 +1,11 @@
 import sqlite3
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 #Open database
-conn = sqlite3.connect('database.db')
+conn = sqlite3.connect(os.getenv("DATABASE_PATH", "database.db"))
 
 #Create table
 conn.execute('''CREATE TABLE users 
