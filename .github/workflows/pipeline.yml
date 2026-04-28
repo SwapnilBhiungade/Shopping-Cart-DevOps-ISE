@@ -201,7 +201,7 @@
         - name: Wait for Render Deploy
           run: sleep 45
 
-        - name: Show Live URL!
+        - name: Show Live URL
           run: |
             echo "======================================"
             echo "Application is LIVE 🚀"
