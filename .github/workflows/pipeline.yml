@@ -198,12 +198,18 @@
           run: |
             curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK }}"
 
-        - name: Wait for Render Deploy
-          run: sleep 45
+        - name: Wait for deployment
+          run: sleep 60
 
-        - name: Show Live URL
+        - name: Fetch Live URL
           run: |
-            echo "======================================"
+            RESPONSE=$(curl -s \
+              -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
+              https://api.render.com/v1/services/${{ secrets.RENDER_SERVICE_ID }})
+
+            URL=$(echo "$RESPONSE" | jq -r '.serviceDetails.url')
+
+            echo "=================================="
             echo "Application is LIVE 🚀"
-            echo "URL: https://shopping-cart.onrender.com"
-            echo "======================================"
+            echo "URL: $URL"
+            echo "=================================="
