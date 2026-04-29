@@ -210,6 +210,6 @@
             URL=$(echo "$RESPONSE" | jq -r '.serviceDetails.url')
 
             echo "=================================="
-            echo "Application is LIVE 🚀"
+            echo "Application is LIVE! 🚀"
             echo "URL: $URL"
             echo "=================================="
