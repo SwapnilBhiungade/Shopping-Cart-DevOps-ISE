@@ -41,6 +41,10 @@ def env_bool(name, default=False):
     return os.getenv(name, str(default)).lower() in ("1", "true", "yes", "on")
 
 
+def get_int_arg(name):
+    return request.args.get(name, type=int)
+
+
 def getLoginDetails():
     with sqlite3.connect(DATABASE_PATH) as conn:
         cur = conn.cursor()
@@ -121,7 +125,10 @@ def remove():
 
 @app.route("/removeItem")
 def removeItem():
-    productId = request.args.get('productId')
+    productId = get_int_arg('productId')
+    if productId is None:
+        return redirect(url_for('root'))
+
     with sqlite3.connect(DATABASE_PATH) as conn:
         try:
             cur = conn.cursor()
@@ -138,7 +145,10 @@ def removeItem():
 @app.route("/displayCategory")
 def displayCategory():
         loggedIn, firstName, noOfItems = getLoginDetails()
-        categoryId = request.args.get("categoryId")
+        categoryId = get_int_arg("categoryId")
+        if categoryId is None:
+            return redirect(url_for('root'))
+
         with sqlite3.connect(DATABASE_PATH) as conn:
             cur = conn.cursor()
             cur.execute("SELECT products.productId, products.name, products.price, products.image, categories.name FROM products, categories WHERE products.categoryId = categories.categoryId AND categories.categoryId = ?", (categoryId, ))
@@ -259,7 +269,10 @@ def login():
 @app.route("/productDescription")
 def productDescription():
     loggedIn, firstName, noOfItems = getLoginDetails()
-    productId = request.args.get('productId')
+    productId = get_int_arg('productId')
+    if productId is None:
+        return redirect(url_for('root'))
+
     with sqlite3.connect(DATABASE_PATH) as conn:
         cur = conn.cursor()
         cur.execute('SELECT productId, name, price, description, image, stock FROM products WHERE productId = ?', (productId, ))
@@ -272,7 +285,10 @@ def addToCart():
     if 'email' not in session:
         return redirect(url_for('loginForm'))
     else:
-        productId = int(request.args.get('productId'))
+        productId = get_int_arg('productId')
+        if productId is None:
+            return redirect(url_for('root'))
+
         with sqlite3.connect(DATABASE_PATH) as conn:
             cur = conn.cursor()
             cur.execute("SELECT userId FROM users WHERE email = ?", (session['email'], ))
@@ -309,7 +325,10 @@ def removeFromCart():
     if 'email' not in session:
         return redirect(url_for('loginForm'))
     email = session['email']
-    productId = int(request.args.get('productId'))
+    productId = get_int_arg('productId')
+    if productId is None:
+        return redirect(url_for('root'))
+
     with sqlite3.connect(DATABASE_PATH) as conn:
         cur = conn.cursor()
         cur.execute("SELECT userId FROM users WHERE email = ?", (email, ))
